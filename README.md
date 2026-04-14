@@ -291,9 +291,3 @@ rm -rf build install log
 source /opt/ros/$ROS_DISTRO/setup.bash
 colcon build --symlink-install
 ```
-
----
-
-# 👩‍💻 Maintainer
-
-****
