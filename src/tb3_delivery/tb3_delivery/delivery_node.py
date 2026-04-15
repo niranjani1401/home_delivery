@@ -2,7 +2,7 @@
 """
 Autonomous Delivery Node
 Navigates TurtleBot3 to predefined delivery locations in sequence.
-Supports: kitchen, bedroom, living_room, charging_station
+Supports: kitchen, bedroom, living_room, bathroom, charging_station
 
 Novelty Features:
   - Multi-stop delivery queue (comma-separated locations)
@@ -30,12 +30,14 @@ from datetime import datetime
 # Kitchen: right side, above kitchen wall (y=1), left of table (3,3)
 # Living room: left-bottom area, away from couch (-3,-3) and bookshelf (-4.5,-1)
 # Bedroom: left-top area, away from bed (-3, 3.5)
+# Bathroom: bottom-left isolated room
 # Charging station: safe open area in bottom-right quadrant
 DELIVERY_LOCATIONS = {
-    'kitchen':          (2.0,  2.0,  0.0),   # open area near doorway, clear of table/chairs
-    'living_room':      (-2.0, -2.5, 1.57),  # left-bottom, clear of couch
-    'bedroom':          (-2.0,  2.5, 3.14),  # left room, near doorway gap
-    'charging_station': (2.0,  -2.0, 0.0),   # right-bottom, open space
+    'kitchen':          (2.0,   2.0,  0.0),   # open area near doorway, clear of table/chairs
+    'living_room':      (-2.0, -2.5,  1.57),  # left-bottom, clear of couch
+    'bedroom':          (-2.0,  2.5,  3.14),  # left room, near doorway gap
+    'bathroom':         (-3.79, -3.13, 1.57), # bottom-left isolated room
+    'charging_station': (2.0,  -2.0,  0.0),   # right-bottom, open space
 }
 
 # Battery simulation parameters
