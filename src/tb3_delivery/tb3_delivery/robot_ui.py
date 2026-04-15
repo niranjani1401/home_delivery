@@ -16,7 +16,7 @@ import os
 import time
 
 
-LOCATIONS = ['kitchen', 'living_room', 'bedroom', 'charging_station']
+LOCATIONS = ['kitchen', 'living_room', 'bedroom', 'bathroom', 'charging_station']
 
 
 class RobotUI(Node):
@@ -102,12 +102,12 @@ class RobotUI(Node):
             print('║' + '  DELIVERY COMMANDS'.ljust(W) + '║')
             for i, loc in enumerate(LOCATIONS, 1):
                 print('║' + f'    {i}. Send to {loc}'.ljust(W) + '║')
-            print('║' + f'    5. Multi-stop delivery (enter route)'.ljust(W) + '║')
+            print('║' + f'    6. Multi-stop delivery (enter route)'.ljust(W) + '║')
 
             print('╠' + '─' * W + '╣')
             print('║' + '  CONTROLS'.ljust(W) + '║')
-            print('║' + '    6. Emergency STOP      7. Resume'.ljust(W) + '║')
-            print('║' + '    8. Cancel Delivery'.ljust(W) + '║')
+            print('║' + '    7. Emergency STOP      8. Resume'.ljust(W) + '║')
+            print('║' + '    9. Cancel Delivery'.ljust(W) + '║')
 
             print('╠' + '─' * W + '╣')
             print('║' + '  MANUAL MOVEMENT'.ljust(W) + '║')
@@ -158,7 +158,7 @@ class RobotUI(Node):
         return lines
 
     def handle_input(self, choice):
-        if choice in ['1', '2', '3', '4']:
+        if choice in ['1', '2', '3', '4', '5']:
             loc = LOCATIONS[int(choice) - 1]
             msg = String()
             msg.data = loc
@@ -166,7 +166,7 @@ class RobotUI(Node):
             print(f'📦 Sending robot to: {loc}')
             time.sleep(1)
 
-        elif choice == '5':
+        elif choice == '6':
             print('\n📋 Multi-stop delivery')
             print(f'   Available: {", ".join(LOCATIONS)}')
             print('   Enter comma-separated route (e.g., kitchen,bedroom,charging_station):')
@@ -181,21 +181,21 @@ class RobotUI(Node):
                 print(f'📦 Queued multi-stop route: {route}')
                 time.sleep(1)
 
-        elif choice == '6':
+        elif choice == '7':
             msg = Bool()
             msg.data = True
             self.estop_pub.publish(msg)
             print('🛑 Emergency stop sent!')
             time.sleep(1)
 
-        elif choice == '7':
+        elif choice == '8':
             msg = Bool()
             msg.data = False
             self.estop_pub.publish(msg)
             print('✅ Resume sent!')
             time.sleep(1)
 
-        elif choice == '8':
+        elif choice == '9':
             msg = Bool()
             msg.data = True
             self.cancel_pub.publish(msg)
