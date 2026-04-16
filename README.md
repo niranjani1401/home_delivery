@@ -1,6 +1,6 @@
-# 🏠 Home Delivery Robot (TurtleBot3 + ROS 2)
+# 🏠 Home Cleaning Robot (TurtleBot3 + ROS 2)
 
-Autonomous indoor home-service delivery robot built with **TurtleBot3**, **Nav2**, and **SLAM Toolbox**.  
+Autonomous indoor home-service cleaning robot built with **TurtleBot3**, **Nav2**, and **SLAM Toolbox**.  
 Supports both:
 
 - **ROS 2 Humble** (Ubuntu 22.04)
@@ -8,20 +8,20 @@ Supports both:
 
 The project includes:
 
-- Autonomous multi-location delivery
+- Autonomous multi-location cleaning
 - Emergency stop (manual + obstacle-triggered)
-- Delivery queue and history
+- Cleaning queue and history
 - Battery simulation + auto return-to-base
 - Terminal-based Robot UI
 - Automatic map generation script (`generate_map.py`)
-- Navigation launch for simulation and autonomous delivery
+- Navigation launch for simulation and autonomous cleaning
 
 ---
 
 ## 📦 Repository Structure
 
 ```text
-home_delivery/
+home_cleaning/
 ├── scripts/
 │   └── setup_env.sh
 └── src/
@@ -43,14 +43,14 @@ home_delivery/
 
 ---
 
-## 🚀 Features
+## Features
 
 - ✅ ROS 2 package using `ament_python`
 - ✅ Works on both Humble and Jazzy
 - ✅ Handles Gazebo Classic (Humble) and new Gazebo (`ros_gz_sim`, Jazzy)
-- ✅ Autonomous delivery to predefined locations
+- ✅ Autonomous cleaning at predefined locations (kitchen, living_room, bedroom, bathroom, charging_station)
 - ✅ Emergency stop via keyboard and LaserScan safety threshold
-- ✅ Delivery cancel support
+- ✅ Cleaning task cancel support
 - ✅ UI for status, battery, queue, and history
 - ✅ Automatic map generation workflow
 
@@ -140,7 +140,7 @@ sudo add-apt-repository universe -y
 sudo curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key \
   -o /usr/share/keyrings/ros-archive-keyring.gpg
 
-echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu $(. /etc/os-release && echo $UBUNTU_CODENAME) main" \
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu $(. /env/os-release && echo $UBUNTU_CODENAME) main" \
 | sudo tee /etc/apt/sources.list.d/ros2.list > /dev/null
 
 sudo apt update
@@ -215,7 +215,7 @@ src/tb3_delivery/maps/
 
 ---
 
-# 🧭 Run Navigation + Delivery
+# 🧭 Run Navigation + Cleaning
 
 ## Terminal 1: Start navigation stack
 
@@ -238,7 +238,7 @@ ros2 run tb3_delivery robot_ui
 
 # 🧪 Useful Test Commands
 
-Send delivery request manually:
+Send cleaning request manually:
 
 ```bash
 ros2 topic pub /delivery_request std_msgs/msg/String "{data: 'kitchen'}" --once
@@ -256,7 +256,7 @@ Clear emergency stop:
 ros2 topic pub /emergency_stop std_msgs/msg/Bool "{data: false}" --once
 ```
 
-Cancel delivery:
+Cancel cleaning:
 
 ```bash
 ros2 topic pub /cancel_delivery std_msgs/msg/Bool "{data: true}" --once
