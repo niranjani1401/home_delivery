@@ -20,20 +20,22 @@ class RobotUI(Node):
     def __init__(self):
         super().__init__('robot_ui')
 
+        # Publishers — must match cleaning_node.py topic names exactly
         self.clean_pub  = self.create_publisher(String,       '/clean_request',   10)
         self.estop_pub  = self.create_publisher(Bool,         '/emergency_stop',  10)
         self.cancel_pub = self.create_publisher(Bool,         '/cancel_cleaning', 10)
         self.cmdvel_pub = self.create_publisher(TwistStamped, '/cmd_vel',         10)
 
-        self._status    = 'UNKNOWN'
-        self._room      = 'UNKNOWN'
-        self._progress  = 'N/A'
-        self._front     = float('inf')
-        self._estop     = False
-        self._battery   = 100.0
-        self._queue     = 'EMPTY'
-        self._history   = 'No sessions yet'
+        self._status   = 'UNKNOWN'
+        self._room     = 'UNKNOWN'
+        self._progress = 'N/A'
+        self._front    = float('inf')
+        self._estop    = False
+        self._battery  = 100.0
+        self._queue    = 'EMPTY'
+        self._history  = 'No sessions yet'
 
+        # Subscriptions — must match cleaning_node.py topic names exactly
         self.create_subscription(String,    '/cleaning_status',   self._cb_status,   10)
         self.create_subscription(String,    '/current_room',      self._cb_room,     10)
         self.create_subscription(String,    '/cleaning_progress', self._cb_progress, 10)
@@ -65,7 +67,7 @@ class RobotUI(Node):
         time.sleep(2)
         while rclpy.ok():
             os.system('clear')
-            W = 56
+            W         = 56
             estop_str = '🔴 ACTIVE' if self._estop else '🟢 CLEAR'
             front_str = f'{self._front:.2f}m' if self._front != float('inf') else 'N/A'
             batt_icon = '🪫' if self._battery <= 25 else '🔋'
@@ -81,6 +83,7 @@ class RobotUI(Node):
             self._row('Emergency Stop', estop_str,      W)
             self._row('Battery',        batt_str,       W)
             self._row('Queue',          self._queue,    W)
+
             print('╠' + '═' * W + '╣')
             print('║' + '  CLEAN COMMANDS'.ljust(W) + '║')
             for i, r in enumerate(ROOMS, 1):
@@ -88,18 +91,23 @@ class RobotUI(Node):
             print('║' + '    4. Clean ALL rooms'.ljust(W) + '║')
             print('║' + '    5. Custom room sequence'.ljust(W) + '║')
             print('║' + '    6. Go to charging station'.ljust(W) + '║')
+
             print('╠' + '─' * W + '╣')
             print('║' + '  CONTROLS'.ljust(W) + '║')
-            print('║' + '    7. Emergency STOP      8. Resume'.ljust(W) + '║')
+            print('║' + '    7. Emergency STOP'.ljust(W) + '║')
+            print('║' + '    8. Resume (clear emergency stop)'.ljust(W) + '║')
             print('║' + '    9. Cancel current cleaning'.ljust(W) + '║')
+
             print('╠' + '─' * W + '╣')
             print('║' + '  MANUAL MOVEMENT'.ljust(W) + '║')
             print('║' + '    W. Forward   S. Backward'.ljust(W) + '║')
             print('║' + '    A. Turn Left  D. Turn Right  X. Halt'.ljust(W) + '║')
+
             print('╠' + '─' * W + '╣')
             print('║' + '  HISTORY'.ljust(W) + '║')
             for hl in self._wrap(self._history, W - 4)[:3]:
                 print('║' + ('  ' + hl).ljust(W) + '║')
+
             print('╠' + '─' * W + '╣')
             print('║' + '    Q. Quit'.ljust(W) + '║')
             print('╚' + '═' * W + '╝')
@@ -123,9 +131,11 @@ class RobotUI(Node):
         lines = []
         while text:
             if len(text) <= width:
-                lines.append(text); break
+                lines.append(text)
+                break
             idx = text.rfind(' ', 0, width)
-            if idx == -1: idx = width
+            if idx == -1:
+                idx = width
             lines.append(text[:idx])
             text = text[idx:].lstrip()
         return lines
@@ -151,26 +161,37 @@ class RobotUI(Node):
                 self._send_clean(seq)
 
         elif choice == '6':
-            self._send_clean('__charge__')
+            # Send to charging station by publishing to clean_request
+            # cleaning_node handles __charge__ as special token
+            msg      = String()
+            msg.data = '__charge__'
+            self.clean_pub.publish(msg)
             print('🔌 Heading to charging station')
             time.sleep(1)
 
         elif choice == '7':
-            msg = Bool(); msg.data = True
+            # Emergency STOP — publish True to /emergency_stop
+            msg      = Bool()
+            msg.data = True
             self.estop_pub.publish(msg)
-            print('🛑 Emergency stop!')
+            print('🛑 Emergency stop sent!')
             time.sleep(1)
 
         elif choice == '8':
-            msg = Bool(); msg.data = False
+            # Resume — publish False to /emergency_stop
+            # cleaning_node will resume from saved waypoint
+            msg      = Bool()
+            msg.data = False
             self.estop_pub.publish(msg)
-            print('✅ Resumed')
+            print('✅ Resume sent — robot will continue from where it stopped')
             time.sleep(1)
 
         elif choice == '9':
-            msg = Bool(); msg.data = True
+            # Cancel — publish True to /cancel_cleaning
+            msg      = Bool()
+            msg.data = True
             self.cancel_pub.publish(msg)
-            print('🚫 Cancelled')
+            print('🚫 Cancel sent — stopping and clearing queue')
             time.sleep(1)
 
         elif choice == 'W': self._move(0.2,  0.0)
@@ -178,26 +199,28 @@ class RobotUI(Node):
         elif choice == 'A': self._move(0.0,  0.5)
         elif choice == 'D': self._move(0.0, -0.5)
         elif choice == 'X': self._move(0.0,  0.0)
+
         elif choice == 'Q':
             print('Goodbye!')
             raise SystemExit(0)
 
     def _send_clean(self, room_or_seq):
-        msg = String(); msg.data = room_or_seq
+        msg      = String()
+        msg.data = room_or_seq
         self.clean_pub.publish(msg)
         print(f'🧹 Cleaning request: {room_or_seq}')
         time.sleep(1)
 
     def _move(self, linear, angular):
         t = TwistStamped()
-        t.header.stamp = self.get_clock().now().to_msg()
+        t.header.stamp    = self.get_clock().now().to_msg()
         t.header.frame_id = 'base_link'
         t.twist.linear.x  = linear
         t.twist.angular.z = angular
         self.cmdvel_pub.publish(t)
         time.sleep(0.5)
         stop = TwistStamped()
-        stop.header.stamp = self.get_clock().now().to_msg()
+        stop.header.stamp    = self.get_clock().now().to_msg()
         stop.header.frame_id = 'base_link'
         self.cmdvel_pub.publish(stop)
 
