@@ -25,16 +25,16 @@ from datetime import datetime
 # ── Room definitions (bounding boxes in world coordinates) ──────────────────
 ROOMS = {
     'kitchen':     {'x_min': 1.5,  'x_max': 3.0,  'y_min': 1.5,  'y_max': 3.0},
-    'living_room': {'x_min': -3.0, 'x_max': -0.6,  'y_min': -3.0, 'y_max': -0.6},
-    'bedroom':     {'x_min': -3.0, 'x_max': -0.8,  'y_min': 1.2,  'y_max': 3.5},
+    'living_room': {'x_min': -3.0, 'x_max': -0.6, 'y_min': -3.0, 'y_max': -0.6},
+    'bedroom':     {'x_min': -3.0, 'x_max': -0.8, 'y_min': 1.2,  'y_max': 3.5},
 }
-CHARGING_STATION      = (2.0, -2.0, 0.0)
-COVERAGE_STEP         = 0.40
-OBSTACLE_DIST         = 0.20
-TRAJECTORY_DIR        = os.path.expanduser('~/tb3_delivery_ws/trajectories')
-BATTERY_FULL          = 100.0
+CHARGING_STATION       = (2.0, -2.0, 0.0)
+COVERAGE_STEP          = 0.40
+OBSTACLE_DIST          = 0.20
+TRAJECTORY_DIR         = os.path.expanduser('~/tb3_delivery_ws/trajectories')
+BATTERY_FULL           = 100.0
 BATTERY_DRAIN_PER_ROOM = 20.0
-BATTERY_LOW_THRESHOLD = 25.0
+BATTERY_LOW_THRESHOLD  = 25.0
 
 
 def generate_coverage_path(room: dict, step: float = COVERAGE_STEP):
@@ -44,7 +44,7 @@ def generate_coverage_path(room: dict, step: float = COVERAGE_STEP):
     y_min = room['y_min']
     y_max = room['y_max']
 
-    x = x_min
+    x   = x_min
     col = 0
     while x <= x_max + 0.01:
         if col % 2 == 0:
@@ -56,7 +56,7 @@ def generate_coverage_path(room: dict, step: float = COVERAGE_STEP):
 
         waypoints.append((x, y_start, yaw))
         waypoints.append((x, y_end,   yaw))
-        x += step
+        x  += step
         col += 1
 
     return waypoints
@@ -84,14 +84,18 @@ class CleaningNode(Node):
         self.queue_pub    = self.create_publisher(String,  '/cleaning_queue',    10)
 
         # ── State ─────────────────────────────────────────────────────────
-        self._emergency_stop      = False
-        self._obstacle_paused     = False
-        self._is_cleaning         = False
-        self._cancel_requested    = False
-        self._current_goal_handle = None
-        self._cleaning_queue      = deque()
-        self._cleaning_history    = []
-        self._battery_level       = BATTERY_FULL
+        self._emergency_stop       = False
+        self._obstacle_paused      = False
+        self._is_cleaning          = False
+        self._cancel_requested     = False
+        self._current_goal_handle  = None
+        self._cleaning_queue       = deque()
+        self._cleaning_history     = []
+        self._battery_level        = BATTERY_FULL
+
+        # Resume tracking — saved when estop fires
+        self._interrupted_room     = None
+        self._interrupted_waypoint = 0
 
         # Trajectory logging
         os.makedirs(TRAJECTORY_DIR, exist_ok=True)
@@ -106,9 +110,9 @@ class CleaningNode(Node):
         self.get_logger().info(
             '🧹 Cleaning Node started\n'
             '   /clean_request   — room name, comma list, or "all"\n'
-            '   /cancel_cleaning — Bool true to cancel\n'
+            '   /cancel_cleaning — Bool true to cancel + return to base\n'
+            '   /emergency_stop  — Bool true to stop, false to resume\n'
             '   /cleaning_status — current status\n'
-            '   /cleaning_progress — waypoint X/Y\n'
             f'  Trajectories saved to: {TRAJECTORY_DIR}'
         )
         self.publish_status('IDLE')
@@ -123,8 +127,6 @@ class CleaningNode(Node):
         if n < 30:
             return
 
-        # Only check FRONT 60° arc while navigating.
-        # Side/rear walls will always be close — don't trigger on them.
         front_indices = list(range(0, 30)) + list(range(n - 30, n))
         close = [
             ranges[i] for i in front_indices
@@ -159,28 +161,77 @@ class CleaningNode(Node):
     # ── Emergency stop ────────────────────────────────────────────────────
     def estop_callback(self, msg: Bool):
         if msg.data:
-            self._emergency_stop = True
-            self.get_logger().warn('🛑 EMERGENCY STOP')
+            # STOP — save current position for resume
+            self._emergency_stop       = True
+            self._interrupted_room     = self._current_room
+            self._interrupted_waypoint = self._waypoint_index
+            self.get_logger().warn(
+                f'🛑 EMERGENCY STOP — saved: '
+                f'{self._interrupted_room} waypoint {self._interrupted_waypoint}'
+            )
             self.publish_status('EMERGENCY_STOP')
             if self._current_goal_handle:
                 self._current_goal_handle.cancel_goal_async()
             self._save_trajectory(self._current_room or 'unknown', aborted=True)
+
         else:
+            # RESUME — go back to where we stopped
             self._emergency_stop = False
             self.get_logger().info('✅ Emergency stop cleared')
-            self.publish_status('IDLE')
+
+            if self._interrupted_room and self._interrupted_room in ROOMS:
+                room = self._interrupted_room
+                wp   = self._interrupted_waypoint
+                self._interrupted_room     = None
+                self._interrupted_waypoint = 0
+
+                self.get_logger().info(
+                    f'🔄 Resuming cleaning of {room} from waypoint {wp}'
+                )
+                self.publish_status(f'RESUMING:{room}')
+
+                # Restore state
+                self._current_room     = room
+                self._is_cleaning      = True
+                self._cancel_requested = False
+                path = generate_coverage_path(ROOMS[room])
+                self._total_waypoints  = len(path)
+                self._waypoint_index   = wp
+
+                # Navigate to the saved waypoint
+                self._navigate_to_waypoint(path[wp], wp, self._total_waypoints)
+            else:
+                self.publish_status('IDLE')
 
     # ── Cancel ────────────────────────────────────────────────────────────
     def cancel_callback(self, msg: Bool):
         if msg.data:
-            self._cancel_requested = True
+            self.get_logger().warn('🚫 Cancel cleaning — returning to charging station')
+
+            # Clear everything so nothing resumes
+            self._cancel_requested     = True
+            self._interrupted_room     = None
+            self._interrupted_waypoint = 0
             self._cleaning_queue.clear()
-            self.get_logger().warn('🚫 Cleaning cancelled')
-            if self._current_goal_handle:
+
+            # Cancel active nav goal
+            if self._current_goal_handle is not None:
                 self._current_goal_handle.cancel_goal_async()
+
             self._save_trajectory(self._current_room or 'unknown', aborted=True)
-            self._is_cleaning = False
+
+            # Reset state
+            self._is_cleaning     = False
+            self._current_room    = None
+            self._waypoint_index  = 0
+            self._total_waypoints = 0
+            self._trajectory_log  = []
+
             self.publish_status('CANCELLED')
+            self._publish_queue()
+
+            # Return to charging station
+            self._navigate_to_charging_station()
 
     # ── Clean request ─────────────────────────────────────────────────────
     def clean_callback(self, msg: String):
@@ -189,6 +240,9 @@ class CleaningNode(Node):
         if self._emergency_stop:
             self.get_logger().warn('Cannot clean — emergency stop active.')
             return
+
+        # Reset cancel flag so new requests work after a cancel
+        self._cancel_requested = False
 
         if raw == 'all':
             rooms = list(ROOMS.keys())
@@ -213,14 +267,19 @@ class CleaningNode(Node):
 
     # ── Queue processing ──────────────────────────────────────────────────
     def _process_next_room(self):
+        if self._cancel_requested:
+            self._cancel_requested = False
+            self.publish_status('IDLE')
+            return
+
         if not self._cleaning_queue:
             self.get_logger().info('✅ All rooms cleaned. Returning to charging station.')
             self.publish_status('RETURNING_TO_BASE')
             self._navigate_to_charging_station()
             return
 
-        if self._emergency_stop or self._cancel_requested:
-            self._cancel_requested = False
+        if self._emergency_stop:
+            self.get_logger().warn('Queue paused — emergency stop active.')
             return
 
         if self._battery_level <= BATTERY_LOW_THRESHOLD:
@@ -251,7 +310,7 @@ class CleaningNode(Node):
         )
         self.publish_status(f'CLEANING:{room_name}')
 
-        room_msg = String()
+        room_msg      = String()
         room_msg.data = room_name
         self.room_pub.publish(room_msg)
 
@@ -260,17 +319,18 @@ class CleaningNode(Node):
     # ── Waypoint navigation ───────────────────────────────────────────────
     def _navigate_to_waypoint(self, waypoint, index: int, total: int):
         if self._emergency_stop or self._cancel_requested:
+            self.get_logger().info('Navigation skipped — stopped/cancelled.')
             return
 
         x, y, yaw = waypoint
 
         goal_msg = NavigateToPose.Goal()
         goal_msg.pose = PoseStamped()
-        goal_msg.pose.header.frame_id = 'map'
-        goal_msg.pose.header.stamp = self.get_clock().now().to_msg()
-        goal_msg.pose.pose.position.x = x
-        goal_msg.pose.pose.position.y = y
-        goal_msg.pose.pose.position.z = 0.0
+        goal_msg.pose.header.frame_id    = 'map'
+        goal_msg.pose.header.stamp       = self.get_clock().now().to_msg()
+        goal_msg.pose.pose.position.x    = x
+        goal_msg.pose.pose.position.y    = y
+        goal_msg.pose.pose.position.z    = 0.0
         goal_msg.pose.pose.orientation.z = math.sin(yaw / 2.0)
         goal_msg.pose.pose.orientation.w = math.cos(yaw / 2.0)
 
@@ -283,8 +343,8 @@ class CleaningNode(Node):
             'yaw':       yaw,
         })
 
-        progress = f'{index + 1}/{total}'
-        prog_msg = String()
+        progress      = f'{index + 1}/{total}'
+        prog_msg      = String()
         prog_msg.data = f'{self._current_room}:{progress}:({x:.1f},{y:.1f})'
         self.progress_pub.publish(prog_msg)
 
@@ -320,18 +380,30 @@ class CleaningNode(Node):
     def _waypoint_result_cb(self, future, waypoint, index, total):
         self._current_goal_handle = None
 
-        if self._emergency_stop or self._cancel_requested:
+        # Emergency stopped — wait for resume, don't advance
+        if self._emergency_stop:
+            self.get_logger().info(
+                f'Waypoint interrupted by emergency stop — '
+                f'saved {self._current_room} wp {self._waypoint_index}'
+            )
             return
 
+        # Cancelled — stop completely
+        if self._cancel_requested:
+            self.get_logger().info('Waypoint interrupted by cancel.')
+            return
+
+        # Obstacle paused — scan_callback will resume
         if self._obstacle_paused:
-            # Will be resumed by scan_callback when obstacle clears
             return
 
-        # Succeeded, cancelled, or failed — always advance to next waypoint.
-        # This prevents infinite retry loops on unreachable waypoints.
+        # Normal — advance to next waypoint
         self._advance_waypoint(index, total)
 
     def _advance_waypoint(self, current_index: int, total: int):
+        if self._cancel_requested or self._emergency_stop:
+            return
+
         next_index = current_index + 1
 
         if next_index >= total:
@@ -341,12 +413,11 @@ class CleaningNode(Node):
             timestamp = datetime.now().strftime('%H:%M:%S')
             entry = f'[{timestamp}] ✅ {self._current_room} cleaned'
             self._cleaning_history.append(entry)
-            hist_msg = String()
+            hist_msg      = String()
             hist_msg.data = ' | '.join(self._cleaning_history[-10:])
             self.history_pub.publish(hist_msg)
 
             self._save_trajectory(self._current_room)
-
             self._battery_level = max(
                 0.0, self._battery_level - BATTERY_DRAIN_PER_ROOM
             )
@@ -366,10 +437,10 @@ class CleaningNode(Node):
 
         goal_msg = NavigateToPose.Goal()
         goal_msg.pose = PoseStamped()
-        goal_msg.pose.header.frame_id = 'map'
-        goal_msg.pose.header.stamp = self.get_clock().now().to_msg()
-        goal_msg.pose.pose.position.x = x
-        goal_msg.pose.pose.position.y = y
+        goal_msg.pose.header.frame_id    = 'map'
+        goal_msg.pose.header.stamp       = self.get_clock().now().to_msg()
+        goal_msg.pose.pose.position.x    = x
+        goal_msg.pose.pose.position.y    = y
         goal_msg.pose.pose.orientation.z = math.sin(yaw / 2.0)
         goal_msg.pose.pose.orientation.w = math.cos(yaw / 2.0)
 
@@ -410,8 +481,8 @@ class CleaningNode(Node):
             return
 
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        suffix = '_ABORTED' if aborted else ''
-        base = os.path.join(TRAJECTORY_DIR, f'{room_name}_{timestamp}{suffix}')
+        suffix    = '_ABORTED' if aborted else ''
+        base      = os.path.join(TRAJECTORY_DIR, f'{room_name}_{timestamp}{suffix}')
 
         csv_path = base + '.csv'
         with open(csv_path, 'w', newline='') as f:
@@ -422,7 +493,7 @@ class CleaningNode(Node):
             writer.writerows(self._trajectory_log)
 
         json_path = base + '.json'
-        metadata = {
+        metadata  = {
             'room':            room_name,
             'date':            datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
             'total_waypoints': len(self._trajectory_log),
@@ -446,18 +517,18 @@ class CleaningNode(Node):
 
     # ── Battery ───────────────────────────────────────────────────────────
     def _publish_battery(self):
-        msg = Float32()
+        msg      = Float32()
         msg.data = self._battery_level
         self.battery_pub.publish(msg)
 
     # ── Helpers ───────────────────────────────────────────────────────────
     def _publish_queue(self):
-        msg = String()
+        msg      = String()
         msg.data = ','.join(self._cleaning_queue) if self._cleaning_queue else 'EMPTY'
         self.queue_pub.publish(msg)
 
     def publish_status(self, status: str):
-        msg = String()
+        msg      = String()
         msg.data = status
         self.status_pub.publish(msg)
 

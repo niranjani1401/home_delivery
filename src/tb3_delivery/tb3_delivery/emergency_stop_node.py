@@ -3,12 +3,13 @@
 Emergency Stop Node
 Monitors for obstacle proximity and provides a software kill switch.
 Publishes to /emergency_stop and directly stops the robot via /cmd_vel.
+Press S to stop, R to resume, Q to quit.
 """
 
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import LaserScan
-from geometry_msgs.msg import Twist, TwistStamped
+from geometry_msgs.msg import TwistStamped
 from std_msgs.msg import Bool, String
 import sys
 import select
@@ -23,17 +24,17 @@ class EmergencyStopNode(Node):
 
     def __init__(self):
         super().__init__('emergency_stop_node')
-        # Note: use_sim_time is auto-declared in Jazzy — no need to declare it
 
         # Publishers
-        self.estop_pub  = self.create_publisher(Bool,   '/emergency_stop', 10)
-        self.cmdvel_pub = self.create_publisher(TwistStamped,  '/cmd_vel',        10)
-        self.status_pub = self.create_publisher(String, '/estop_status',   10)
+        self.estop_pub  = self.create_publisher(Bool,         '/emergency_stop', 10)
+        self.cmdvel_pub = self.create_publisher(TwistStamped, '/cmd_vel',        10)
+        self.status_pub = self.create_publisher(String,       '/estop_status',   10)
 
         # Subscribers
         self.create_subscription(LaserScan, '/scan', self.scan_callback, 10)
 
-        self._stopped = False
+        self._stopped        = False
+        self._auto_stopped   = False  # True when stopped by obstacle (not manual)
 
         # Timer to check keyboard (non-blocking)
         self.create_timer(0.1, self.check_keyboard)
@@ -53,27 +54,34 @@ class EmergencyStopNode(Node):
         except Exception:
             self._settings = None
 
-    # ── Laser-based auto stop ────────────────────────────────────────────────
+    # ── Laser-based auto stop ─────────────────────────────────────────────
     def scan_callback(self, msg: LaserScan):
-        if self._stopped:
-            return
-        # Check front 30° arc (indices around 0)
         ranges = msg.ranges
         n = len(ranges)
         if n < 30:
             return
+
+        # Only check front 30° arc
         front_indices = list(range(0, 15)) + list(range(n - 15, n))
-        close_obstacles = [
-            r for i in front_indices
-            if (r := ranges[i]) > 0.01 and r < SAFE_DISTANCE
+        close = [
+            ranges[i] for i in front_indices
+            if ranges[i] > 0.01 and ranges[i] < SAFE_DISTANCE
         ]
-        if close_obstacles:
+
+        if close and not self._stopped:
             self.get_logger().warn(
-                f'⚠️  Obstacle detected at {min(close_obstacles):.2f}m — AUTO STOP'
+                f'⚠️  Obstacle at {min(close):.2f}m — AUTO STOP'
             )
+            self._auto_stopped = True
             self.trigger_stop(reason='OBSTACLE_PROXIMITY')
 
-    # ── Keyboard handler ─────────────────────────────────────────────────────
+        elif not close and self._auto_stopped and self._stopped:
+            # Obstacle cleared — auto resume
+            self.get_logger().info('✅ Obstacle cleared — auto resuming')
+            self._auto_stopped = False
+            self.clear_stop()
+
+    # ── Keyboard handler ──────────────────────────────────────────────────
     def check_keyboard(self):
         if self._settings is None:
             return
@@ -81,8 +89,10 @@ class EmergencyStopNode(Node):
             if select.select([sys.stdin], [], [], 0)[0]:
                 key = sys.stdin.read(1).lower()
                 if key == 's':
+                    self._auto_stopped = False  # Manual stop, don't auto-resume
                     self.trigger_stop(reason='MANUAL_STOP')
                 elif key == 'r':
+                    self._auto_stopped = False
                     self.clear_stop()
                 elif key == 'q':
                     self.get_logger().info('Quit requested.')
@@ -90,32 +100,47 @@ class EmergencyStopNode(Node):
         except Exception:
             pass
 
-    # ── Stop / Resume ────────────────────────────────────────────────────────
+    # ── Stop ──────────────────────────────────────────────────────────────
     def trigger_stop(self, reason='MANUAL_STOP'):
+        if self._stopped:
+            return  # Already stopped, don't publish again
+
         self._stopped = True
-        # Publish zero velocity
+
+        # Zero velocity immediately
         stop_msg = TwistStamped()
-        stop_msg.header.stamp = self.get_clock().now().to_msg()
+        stop_msg.header.stamp    = self.get_clock().now().to_msg()
         stop_msg.header.frame_id = 'base_link'
         self.cmdvel_pub.publish(stop_msg)
-        # Signal other nodes
-        msg = Bool()
+
+        # Signal cleaning_node to stop and save position
+        msg      = Bool()
         msg.data = True
         self.estop_pub.publish(msg)
-        status = String()
+
+        status      = String()
         status.data = f'STOPPED:{reason}'
         self.status_pub.publish(status)
+
         self.get_logger().warn(f'🛑 STOPPED — reason: {reason}')
 
+    # ── Resume ────────────────────────────────────────────────────────────
     def clear_stop(self):
+        if not self._stopped:
+            return  # Already running, don't publish again
+
         self._stopped = False
-        msg = Bool()
+
+        # Signal cleaning_node to resume from saved waypoint
+        msg      = Bool()
         msg.data = False
         self.estop_pub.publish(msg)
-        status = String()
+
+        status      = String()
         status.data = 'RESUMED'
         self.status_pub.publish(status)
-        self.get_logger().info('✅ Emergency stop cleared — resuming.')
+
+        self.get_logger().info('✅ Emergency stop cleared — cleaning_node will resume.')
 
     def destroy_node(self):
         # Restore terminal
