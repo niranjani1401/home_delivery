@@ -20,12 +20,12 @@ setup(
     zip_safe=True,
     maintainer='Niranjani',
     maintainer_email='niranjanihiremath@gmail.com',
-    description='Autonomous Home Service Delivery Robot using TurtleBot3',
+    description='Autonomous Home Cleaning Robot using TurtleBot3',
     entry_points={
         'console_scripts': [
-            'delivery_node = tb3_delivery.delivery_node:main',
+            'cleaning_node       = tb3_delivery.cleaning_node:main',
             'emergency_stop_node = tb3_delivery.emergency_stop_node:main',
-            'robot_ui = tb3_delivery.robot_ui:main',
+            'robot_ui            = tb3_delivery.robot_ui:main',
         ],
     },
 )

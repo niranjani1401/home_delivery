@@ -1,0 +1,73 @@
+{
+  "room": "kitchen",
+  "date": "2026-04-20 14:56:51",
+  "total_waypoints": 8,
+  "aborted": false,
+  "battery_after": 100.0,
+  "trajectory": [
+    {
+      "timestamp": "14:55:22.466739",
+      "room": "kitchen",
+      "waypoint": 0,
+      "x": 1.5,
+      "y": 1.5,
+      "yaw": 1.57
+    },
+    {
+      "timestamp": "14:55:37.038960",
+      "room": "kitchen",
+      "waypoint": 1,
+      "x": 1.5,
+      "y": 3.0,
+      "yaw": 1.57
+    },
+    {
+      "timestamp": "14:55:50.106964",
+      "room": "kitchen",
+      "waypoint": 2,
+      "x": 1.9,
+      "y": 3.0,
+      "yaw": -1.57
+    },
+    {
+      "timestamp": "14:55:58.577256",
+      "room": "kitchen",
+      "waypoint": 3,
+      "x": 1.9,
+      "y": 1.5,
+      "yaw": -1.57
+    },
+    {
+      "timestamp": "14:56:09.337129",
+      "room": "kitchen",
+      "waypoint": 4,
+      "x": 2.3,
+      "y": 1.5,
+      "yaw": 1.57
+    },
+    {
+      "timestamp": "14:56:17.508518",
+      "room": "kitchen",
+      "waypoint": 5,
+      "x": 2.3,
+      "y": 3.0,
+      "yaw": 1.57
+    },
+    {
+      "timestamp": "14:56:29.876864",
+      "room": "kitchen",
+      "waypoint": 6,
+      "x": 2.6999999999999997,
+      "y": 3.0,
+      "yaw": -1.57
+    },
+    {
+      "timestamp": "14:56:37.345419",
+      "room": "kitchen",
+      "waypoint": 7,
+      "x": 2.6999999999999997,
+      "y": 1.5,
+      "yaw": -1.57
+    }
+  ]
+}

@@ -117,11 +117,11 @@ def generate_launch_description():
         output='screen'
     )
 
-    # ── Delivery Node ─────────────────────────────────────────────────────────
-    delivery_node = Node(
+    # ── Cleaning Node ─────────────────────────────────────────────────────────
+    cleaning_node = Node(
         package='tb3_delivery',
-        executable='delivery_node',
-        name='delivery_node',
+        executable='cleaning_node',
+        name='cleaning_node',
         output='screen',
         parameters=[{'use_sim_time': True}],
     )
@@ -142,6 +142,6 @@ def generate_launch_description():
     ld.add_action(robot_state_publisher)
     ld.add_action(nav2)
     ld.add_action(rviz_node)
-    ld.add_action(delivery_node)
+    ld.add_action(cleaning_node)
     ld.add_action(estop_node)
     return ld

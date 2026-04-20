@@ -1,0 +1,17 @@
+{
+  "room": "kitchen_autosave",
+  "date": "2026-04-20 14:37:10",
+  "total_waypoints": 1,
+  "aborted": false,
+  "battery_after": 100.0,
+  "trajectory": [
+    {
+      "timestamp": "14:37:02.121299",
+      "room": "kitchen",
+      "waypoint": 0,
+      "x": 1.5,
+      "y": 1.5,
+      "yaw": 1.57
+    }
+  ]
+}

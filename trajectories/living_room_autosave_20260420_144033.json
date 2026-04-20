@@ -1,0 +1,17 @@
+{
+  "room": "living_room_autosave",
+  "date": "2026-04-20 14:40:33",
+  "total_waypoints": 1,
+  "aborted": false,
+  "battery_after": 80.0,
+  "trajectory": [
+    {
+      "timestamp": "14:39:57.315290",
+      "room": "living_room",
+      "waypoint": 1,
+      "x": -3.0,
+      "y": -0.8,
+      "yaw": 1.57
+    }
+  ]
+}

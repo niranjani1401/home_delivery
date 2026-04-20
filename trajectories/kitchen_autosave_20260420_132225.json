@@ -1,0 +1,49 @@
+{
+  "room": "kitchen_autosave",
+  "date": "2026-04-20 13:22:25",
+  "total_waypoints": 5,
+  "aborted": false,
+  "battery_after": 100.0,
+  "trajectory": [
+    {
+      "timestamp": "13:21:31.890729",
+      "room": "kitchen",
+      "waypoint": 2,
+      "x": 2.2,
+      "y": 3.5,
+      "yaw": -1.57
+    },
+    {
+      "timestamp": "13:21:40.448706",
+      "room": "kitchen",
+      "waypoint": 3,
+      "x": 2.2,
+      "y": 1.8,
+      "yaw": -1.57
+    },
+    {
+      "timestamp": "13:21:54.926275",
+      "room": "kitchen",
+      "waypoint": 4,
+      "x": 2.6,
+      "y": 1.8,
+      "yaw": 1.57
+    },
+    {
+      "timestamp": "13:22:05.490353",
+      "room": "kitchen",
+      "waypoint": 5,
+      "x": 2.6,
+      "y": 3.5,
+      "yaw": 1.57
+    },
+    {
+      "timestamp": "13:22:25.058798",
+      "room": "kitchen",
+      "waypoint": 6,
+      "x": 3.0,
+      "y": 3.5,
+      "yaw": -1.57
+    }
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "room": "bedroom",
+  "date": "2026-04-20 14:58:23",
+  "total_waypoints": 1,
+  "aborted": true,
+  "battery_after": 100.0,
+  "trajectory": [
+    {
+      "timestamp": "14:57:57.607283",
+      "room": "bedroom",
+      "waypoint": 0,
+      "x": -3.0,
+      "y": 1.2,
+      "yaw": 1.57
+    }
+  ]
+}

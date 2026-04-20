@@ -1,0 +1,41 @@
+{
+  "room": "bedroom_autosave",
+  "date": "2026-04-20 12:45:52",
+  "total_waypoints": 4,
+  "aborted": false,
+  "battery_after": 100.0,
+  "trajectory": [
+    {
+      "timestamp": "12:45:12.397913",
+      "room": "bedroom",
+      "waypoint": 6,
+      "x": -0.8,
+      "y": 1.7000000000000002,
+      "yaw": 3.141592653589793
+    },
+    {
+      "timestamp": "12:45:18.352469",
+      "room": "bedroom",
+      "waypoint": 7,
+      "x": -4.2,
+      "y": 1.7000000000000002,
+      "yaw": 3.141592653589793
+    },
+    {
+      "timestamp": "12:45:41.810707",
+      "room": "bedroom",
+      "waypoint": 8,
+      "x": -4.2,
+      "y": 2.0,
+      "yaw": 0.0
+    },
+    {
+      "timestamp": "12:45:47.667891",
+      "room": "bedroom",
+      "waypoint": 9,
+      "x": -0.8,
+      "y": 2.0,
+      "yaw": 0.0
+    }
+  ]
+}
